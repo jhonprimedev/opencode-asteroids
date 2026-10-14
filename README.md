@@ -24,11 +24,12 @@ Luego visita `http://localhost:3000`.
 
 ## Controles
 
-| Tecla     | Acción     |
-| --------- | ---------- |
-| `←` `→`   | Rotar nave |
-| `↑`       | Propulsar  |
-| `Espacio` | Disparar   |
+| Tecla     | Acción                  |
+| --------- | ----------------------- |
+| `←` `→`   | Rotar nave              |
+| `↑`       | Propulsar               |
+| `Espacio` | Disparar                |
+| `C`       | Cambiar skin de la nave |
 
 ## Puntuación
 
@@ -47,3 +48,4 @@ Luego visita `http://localhost:3000`.
 - Power-up de velocidad: los asteroides destruidos pueden soltar un rayo amarillo que duplica el impulso de la nave durante 5 segundos
 - Estrella fugaz: cada 10-15 s cruza la pantalla una estrella dorada mucho más rápida que los asteroides; se desvanece a los 7 s y destruirla otorga 250 puntos bonus
 - Triple disparo: destruirla estrella fugaz activa 5 s de disparo triple (3 balas paralelas en línea recta)
+- Sistema de skins: la tecla `C` rota entre 4 naves (Clásica, Interceptor, Halcón y Espectro), cada una con su propia silueta y colores; la elección se guarda en `localStorage` y los iconos de vidas reflejan la skin activa
