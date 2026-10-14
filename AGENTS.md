@@ -14,7 +14,7 @@ No automated checks exist. Verify changes manually: open `index.html` in a brows
 - Two input mechanisms: `keys[code]` for held state (rotate/thrust) and `pressed(code)` for single-fire actions (shoot, restart) — `pressed` is consume-on-read via `justPressed`. Any new key that would scroll the page must also be added to the hardcoded `preventDefault` array in the `keydown` listener.
 - Input uses `e.code` values (`'ArrowLeft'`, `'Space'`), not `e.key`.
 - Space is toroidal: all positional updates must go through `wrap()`.
-- Only the speed power-up (drop from destroyed asteroids, doubled thrust for 5 s) is implemented; no other power-ups or the "estrella fugaz" asteroid type exist. Trust `game.js` over the README when they conflict.
+- Implemented extras beyond the base game (trust `game.js` over the README when they conflict): speed power-up (drop from destroyed asteroids, doubled thrust for 5 s), "estrella fugaz" fast golden asteroid (destroying it grants 5 s of triple shot via `ship.tripleShot`), a skin system (`KeyC` cycles 4 ship skins stored in `SKINS`, persisted in `localStorage`), an ovni that spawns every 12-20 s and shoots red `EnemyBullet`s into the separate `enemyBullets` array, and a shield (`ShiftLeft`/`ShiftRight`, 3 s active / 10 s cooldown) that blocks all ship damage while active.
 
 ## Conventions
 

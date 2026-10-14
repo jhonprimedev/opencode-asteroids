@@ -57,6 +57,27 @@ class Bullet {
   }
 }
 
+// ── Bala enemiga ─────────────────────────────────────────────────────────────
+const ENEMY_BULLET_COLOR = '#ff5252';
+const ENEMY_BULLET_SPEED = 360;
+const ENEMY_BULLET_TTL   = 1.5;
+
+class EnemyBullet extends Bullet {
+  constructor(x, y, angle) {
+    super(x, y, angle);
+    this.vx = Math.cos(angle) * ENEMY_BULLET_SPEED;
+    this.vy = Math.sin(angle) * ENEMY_BULLET_SPEED;
+    this.ttl = ENEMY_BULLET_TTL;
+  }
+
+  draw() {
+    ctx.fillStyle = ENEMY_BULLET_COLOR;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 // ── Asteroid ──────────────────────────────────────────────────────────────────
 const RADII  = [0, 16, 30, 50];   // por tamaño 1, 2, 3
 const SPEEDS = [0, 85, 55, 32];   // velocidad base por tamaño
@@ -242,6 +263,12 @@ function cycleSkin() {
 }
 
 // ── Ship ──────────────────────────────────────────────────────────────────────
+// Escudo: Shift lo activa; mientras dura bloquea todo
+const SHIELD_TIME   = 3;      // segundos de protección
+const SHIELD_CD     = 10;     // recarga entre usos
+const SHIELD_RADIUS = 24;     // radio de bloqueo y de dibujo
+const SHIELD_COLOR  = '#54d8ff';
+
 class Ship {
   constructor() { this.reset(); }
 
@@ -258,6 +285,8 @@ class Ship {
     this.dead          = false;
     this.speedBoost    = 0;
     this.tripleShot    = 0;
+    this.shieldTime    = 0;
+    this.shieldCd      = 0;
   }
 
   update(dt) {
@@ -266,6 +295,8 @@ class Ship {
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.speedBoost    > 0) this.speedBoost    -= dt;
     if (this.tripleShot    > 0) this.tripleShot    -= dt;
+    if (this.shieldTime    > 0) this.shieldTime    -= dt;
+    if (this.shieldCd      > 0) this.shieldCd      -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = this.speedBoost > 0 ? 260 * 2 : 260;  // px/s² — doble con power-up de velocidad
@@ -336,6 +367,18 @@ class Ship {
       ctx.strokeStyle = this.speedBoost > 0
         ? 'rgba(255, 210, 63, 0.9)'
         : skin.flame;
+      ctx.stroke();
+    }
+
+    // Anillo del escudo activo, con pulso y desvanecido final
+    if (this.shieldTime > 0) {
+      const fade  = Math.min(1, this.shieldTime / 0.5);
+      const pulse = 0.6 + 0.3 * Math.sin(this.shieldTime * 10);
+      ctx.globalAlpha = fade * pulse;
+      ctx.strokeStyle = SHIELD_COLOR;
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, SHIELD_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -428,12 +471,70 @@ class PowerUp {
   }
 }
 
+// ── Ovni enemigo ──────────────────────────────────────────────────────────────
+const OVNI_COLOR     = '#ff5252';
+const OVNI_POINTS    = 200;    // bonus por destruirlo
+const OVNI_TTL       = 12;     // segundos en pantalla
+const OVNI_EVERY_MIN = 12;     // segundos entre apariciones
+const OVNI_EVERY_MAX = 20;
+const OVNI_FIRE_CD   = 1.4;    // cadencia de disparo
+
+class Ufo {
+  constructor(x, y, angle) {
+    this.x = x;
+    this.y = y;
+    this.radius = 16;
+    this.dead = false;
+    this.ttl  = OVNI_TTL;
+    this.fireCooldown = 0.8;   // dispara pronto tras aparecer
+
+    const speed = rand(90, 120);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+  }
+
+  update(dt) {
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;   // se marcha solo con el tiempo
+    if (this.fireCooldown > 0) this.fireCooldown -= dt;
+  }
+
+  tryShoot(target) {
+    if (this.fireCooldown > 0 || target.dead) return [];
+    this.fireCooldown = OVNI_FIRE_CD;
+    // Apunta a la nave con algo de dispersión
+    const angle = Math.atan2(target.y - this.y, target.x - this.x) + rand(-0.15, 0.15);
+    return [new EnemyBullet(this.x, this.y, angle)];
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.strokeStyle = OVNI_COLOR;
+    ctx.lineWidth   = 1.5;
+    ctx.lineJoin    = 'round';
+
+    // Platillo clásico: casco y cúpula
+    ctx.beginPath();
+    ctx.ellipse(0, 0, this.radius, 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0, -3, this.radius * 0.45, 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles, powerUps;
+let ufo, enemyBullets;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let estrellaTimer;
+let ufoTimer;
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -459,18 +560,33 @@ function spawnEstrella() {
   asteroids.push(new EstrellaFugaz(x, y, angle));
 }
 
+function spawnUfo() {
+  // Nace en un borde y cruza hacia el interior, como la estrella fugaz
+  const edge = randInt(0, 3);
+  let x, y;
+  if (edge === 0)      { x = rand(0, W); y = 0; }   // arriba
+  else if (edge === 1) { x = W; y = rand(0, H); }   // derecha
+  else if (edge === 2) { x = rand(0, W); y = H; }   // abajo
+  else                 { x = 0; y = rand(0, H); }   // izquierda
+  const angle = Math.atan2(H / 2 - y, W / 2 - x) + rand(-0.5, 0.5);
+  ufo = new Ufo(x, y, angle);
+}
+
 function initGame() {
   ship          = new Ship();
   bullets   = [];
   asteroids = [];
   particles = [];
   powerUps  = [];
+  ufo          = null;
+  enemyBullets = [];
   score  = 0;
   lives  = 3;
   level  = 1;
   state  = 'playing';
   spawnAsteroids(4);
   estrellaTimer = rand(ESTRELLA_EVERY_MIN, ESTRELLA_EVERY_MAX);
+  ufoTimer = rand(OVNI_EVERY_MIN, OVNI_EVERY_MAX);
 }
 
 function nextLevel() {
@@ -478,8 +594,11 @@ function nextLevel() {
   bullets   = [];
   particles = [];
   powerUps  = [];
+  enemyBullets = [];
+  ufo = null;
   ship.reset();
   spawnAsteroids(3 + level);
+  ufoTimer = rand(OVNI_EVERY_MIN, OVNI_EVERY_MAX);
 }
 
 function explode(x, y, count = 8) {
@@ -491,6 +610,7 @@ function killShip() {
   ship.dead = true;
   ship.speedBoost = 0;   // el power-up se pierde al morir
   ship.tripleShot = 0;   // el triple disparo también
+  ship.shieldTime = 0;   // el escudo también
   lives--;
   if (lives <= 0) {
     state = 'gameover';
@@ -520,6 +640,10 @@ function update(dt) {
     asteroids.forEach(a => a.update(dt));
     powerUps.forEach(p => p.update(dt));
     powerUps = powerUps.filter(p => !p.dead);
+    if (ufo) ufo.update(dt);   // sigue moviéndose, pero no dispara
+    if (ufo && ufo.dead) ufo = null;
+    enemyBullets.forEach(b => b.update(dt));
+    enemyBullets = enemyBullets.filter(b => !b.dead);
     if (deadTimer <= 0) { state = 'playing'; ship.reset(); }
     return;
   }
@@ -529,11 +653,21 @@ function update(dt) {
     bullets.push(...ship.tryShoot());
   }
 
+  // Activar escudo (Shift izquierdo o derecho); ambos se consumen siempre
+  const shiftL = pressed('ShiftLeft');
+  const shiftR = pressed('ShiftRight');
+  if ((shiftL || shiftR) && ship.shieldCd <= 0) {
+    ship.shieldTime = SHIELD_TIME;
+    ship.shieldCd   = SHIELD_CD;
+  }
+
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
   powerUps.forEach(p => p.update(dt));
   particles.forEach(p => p.update(dt));
+  if (ufo) ufo.update(dt);
+  enemyBullets.forEach(b => b.update(dt));
 
   // Aparición periódica de la estrella fugaz (solo una a la vez)
   estrellaTimer -= dt;
@@ -541,6 +675,17 @@ function update(dt) {
     if (!asteroids.some(a => a instanceof EstrellaFugaz)) spawnEstrella();
     estrellaTimer = rand(ESTRELLA_EVERY_MIN, ESTRELLA_EVERY_MAX);
   }
+
+  // Aparición periódica del ovni (solo uno a la vez)
+  ufoTimer -= dt;
+  if (ufoTimer <= 0) {
+    if (!ufo) spawnUfo();
+    ufoTimer = rand(OVNI_EVERY_MIN, OVNI_EVERY_MAX);
+  }
+
+  // El ovni dispara a la nave
+  if (ufo) enemyBullets.push(...ufo.tryShoot(ship));
+  if (ufo && ufo.dead) ufo = null;
 
   bullets   = bullets.filter(b => !b.dead);
   particles = particles.filter(p => !p.dead);
@@ -567,8 +712,22 @@ function update(dt) {
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
 
-  // Nave vs asteroide
-  if (ship.invincible <= 0) {
+  // Bala del jugador vs ovni
+  if (ufo) {
+    for (const b of bullets) {
+      if (!b.dead && dist(b, ufo) < ufo.radius) {
+        b.dead = true;
+        ufo.dead = true;
+        score += OVNI_POINTS;
+        explode(ufo.x, ufo.y, 10);
+        break;
+      }
+    }
+    if (ufo.dead) ufo = null;
+  }
+
+  // Nave vs asteroide (el escudo activo anula el daño)
+  if (ship.invincible <= 0 && ship.shieldTime <= 0) {
     for (const a of asteroids) {
       if (dist(ship, a) < ship.radius + a.radius * 0.82) {
         killShip();
@@ -576,6 +735,30 @@ function update(dt) {
       }
     }
   }
+
+  // Balas enemigas vs nave: el escudo las vaporiza antes de llegar al casco
+  if (!ship.dead) {
+    for (const b of enemyBullets) {
+      if (b.dead) continue;
+      const d = dist(b, ship);
+      if (ship.shieldTime > 0 && d < SHIELD_RADIUS) {
+        b.dead = true;
+        explode(b.x, b.y, 4);
+      } else if (ship.invincible <= 0 && d < ship.radius) {
+        b.dead = true;
+        killShip();
+        break;
+      }
+    }
+  }
+
+  // Nave vs ovni (el escudo anula la colisión)
+  if (ufo && !ship.dead && ship.invincible <= 0 && ship.shieldTime <= 0
+      && dist(ship, ufo) < ship.radius + ufo.radius) {
+    killShip();
+  }
+
+  enemyBullets = enemyBullets.filter(b => !b.dead);
 
   // Nave vs power-up (pickup)
   for (const pu of powerUps) {
@@ -627,6 +810,17 @@ function drawHUD() {
   if (!ship.dead && ship.tripleShot > 0) {
     ctx.fillStyle = POWERUP_COLOR;
     ctx.fillText(`TRIPLE ${ship.tripleShot.toFixed(1)}s`, 14, effectY);
+    effectY += 22;
+  }
+  ctx.fillStyle = '#fff';
+
+  // Estado del escudo: activo en cian, recarga en gris tenue
+  if (!ship.dead && ship.shieldTime > 0) {
+    ctx.fillStyle = SHIELD_COLOR;
+    ctx.fillText(`ESCUDO ${ship.shieldTime.toFixed(1)}s`, 14, effectY);
+  } else if (!ship.dead && ship.shieldCd > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(`ESCUDO ${ship.shieldCd.toFixed(1)}s`, 14, effectY);
   }
   ctx.fillStyle = '#fff';
 
@@ -664,6 +858,8 @@ function draw() {
   asteroids.forEach(a => a.draw());
   powerUps.forEach(p => p.draw());
   bullets.forEach(b => b.draw());
+  enemyBullets.forEach(b => b.draw());
+  if (ufo) ufo.draw();
   ship.draw();
 
   drawHUD();
