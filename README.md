@@ -32,11 +32,12 @@ Luego visita `http://localhost:3000`.
 
 ## Puntuación
 
-| Asteroide | Puntos |
-| --------- | ------ |
-| Grande    | 20     |
-| Mediano   | 50     |
-| Pequeño   | 100    |
+| Asteroide      | Puntos |
+| -------------- | ------ |
+| Grande         | 20     |
+| Mediano        | 50     |
+| Pequeño        | 100    |
+| Estrella fugaz | 250    |
 
 ## Características
 
@@ -44,3 +45,4 @@ Luego visita `http://localhost:3000`.
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
 - Power-up de velocidad: los asteroides destruidos pueden soltar un rayo amarillo que duplica el impulso de la nave durante 5 segundos
+- Estrella fugaz: cada 10-15 s cruza la pantalla una estrella dorada mucho más rápida que los asteroides; se desvanece a los 7 s y destruirla otorga 250 puntos bonus
