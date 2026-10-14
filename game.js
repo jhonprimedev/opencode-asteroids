@@ -236,6 +236,14 @@ const SKINS = [
     flame:  'rgba(160, 255, 120, 0.85)',
     verts:  [[20, 0], [6, -6], [-6, -11], [-13, -6], [-7, 0], [-13, 6], [-6, 11], [6, 6]],
   },
+  {
+    name:   'Titán',        // nave morada: el doble de grande y el doble de puntos
+    stroke: '#b26bff',
+    flame:  'rgba(205, 130, 255, 0.85)',
+    verts:  [[20, 0], [-12, -9], [-7, 0], [-12, 9]],   // silueta de la Clásica
+    scale:  2,      // el doble de tamaño que la nave original
+    scoreMult: 2,   // duplica los puntos obtenidos
+  },
 ];
 
 const SKIN_KEY   = 'asteroids-skin';  // clave de localStorage
@@ -262,6 +270,10 @@ function cycleSkin() {
   saveSkin(skinIndex);
 }
 
+// Escala de tamaño y multiplicador de puntos de la skin activa (1 por defecto)
+function skinScale()     { return SKINS[skinIndex].scale || 1; }
+function skinScoreMult() { return SKINS[skinIndex].scoreMult || 1; }
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 // Escudo: Shift lo activa; mientras dura bloquea todo
 const SHIELD_TIME   = 3;      // segundos de protección
@@ -278,7 +290,7 @@ class Ship {
     this.angle  = -Math.PI / 2;
     this.vx     = 0;
     this.vy     = 0;
-    this.radius = 12;
+    this.radius = 12 * skinScale();
     this.thrusting     = false;
     this.invincible    = 3;
     this.shootCooldown = 0;
@@ -290,6 +302,8 @@ class Ship {
   }
 
   update(dt) {
+    // El radio de colisión sigue la escala de la skin activa (la Titán es el doble de grande)
+    this.radius = 12 * skinScale();
     if (this.dead) return;
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
@@ -320,7 +334,7 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
+    const NOSE = 21 * skinScale();   // la boca del cañón escala con la nave
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
 
@@ -341,6 +355,7 @@ class Ship {
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
     const skin = SKINS[skinIndex];
+    const s    = skinScale();   // naves como la Titán se dibujan a escala mayor
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -351,18 +366,18 @@ class Ship {
 
     // Silueta de la skin activa
     ctx.beginPath();
-    ctx.moveTo(skin.verts[0][0], skin.verts[0][1]);
+    ctx.moveTo(skin.verts[0][0] * s, skin.verts[0][1] * s);
     for (let i = 1; i < skin.verts.length; i++)
-      ctx.lineTo(skin.verts[i][0], skin.verts[i][1]);
+      ctx.lineTo(skin.verts[i][0] * s, skin.verts[i][1] * s);
     ctx.closePath();
     ctx.stroke();
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
       ctx.beginPath();
-      ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
-      ctx.lineTo(-8, 4);
+      ctx.moveTo(-8 * s, -4 * s);
+      ctx.lineTo(-8 * s - rand(6, 14) * s, 0);
+      ctx.lineTo(-8 * s, 4 * s);
       // Llama amarilla mientras dura el power-up de velocidad
       ctx.strokeStyle = this.speedBoost > 0
         ? 'rgba(255, 210, 63, 0.9)'
@@ -378,7 +393,7 @@ class Ship {
       ctx.strokeStyle = SHIELD_COLOR;
       ctx.lineWidth   = 1.5;
       ctx.beginPath();
-      ctx.arc(0, 0, SHIELD_RADIUS, 0, Math.PI * 2);
+      ctx.arc(0, 0, SHIELD_RADIUS * s, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -535,6 +550,11 @@ let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let estrellaTimer;
 let ufoTimer;
+
+function addScore(points) {
+  // La skin activa puede multiplicar los puntos (la Titán los duplica)
+  score += points * skinScoreMult();
+}
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -697,7 +717,7 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += a.points;
+        addScore(a.points);
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
         // La estrella fugaz otorga triple disparo; los asteroides normales pueden soltar velocidad
@@ -718,7 +738,7 @@ function update(dt) {
       if (!b.dead && dist(b, ufo) < ufo.radius) {
         b.dead = true;
         ufo.dead = true;
-        score += OVNI_POINTS;
+        addScore(OVNI_POINTS);
         explode(ufo.x, ufo.y, 10);
         break;
       }
@@ -741,7 +761,8 @@ function update(dt) {
     for (const b of enemyBullets) {
       if (b.dead) continue;
       const d = dist(b, ship);
-      if (ship.shieldTime > 0 && d < SHIELD_RADIUS) {
+      // El escudo cubre toda la nave, también a escala aumentada
+      if (ship.shieldTime > 0 && d < SHIELD_RADIUS * skinScale()) {
         b.dead = true;
         explode(b.x, b.y, 4);
       } else if (ship.invincible <= 0 && d < ship.radius) {
@@ -834,7 +855,8 @@ function drawHUD() {
   if (skinToast > 0) {
     ctx.textAlign = 'center';
     ctx.fillStyle = `rgba(255,255,255,${Math.min(1, skinToast).toFixed(2)})`;
-    ctx.fillText(`SKIN: ${SKINS[skinIndex].name.toUpperCase()}`, W / 2, H - 20);
+    const extra = skinScoreMult() > 1 ? ` — PUNTOS ×${skinScoreMult()}` : '';
+    ctx.fillText(`SKIN: ${SKINS[skinIndex].name.toUpperCase()}${extra}`, W / 2, H - 20);
     ctx.fillStyle = '#fff';
   }
 
