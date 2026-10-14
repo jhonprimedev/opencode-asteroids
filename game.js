@@ -205,6 +205,7 @@ class Ship {
     this.shootCooldown = 0;
     this.dead          = false;
     this.speedBoost    = 0;
+    this.tripleShot    = 0;
   }
 
   update(dt) {
@@ -212,6 +213,7 @@ class Ship {
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.speedBoost    > 0) this.speedBoost    -= dt;
+    if (this.tripleShot    > 0) this.tripleShot    -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = this.speedBoost > 0 ? 260 * 2 : 260;  // px/s² — doble con power-up de velocidad
@@ -238,6 +240,15 @@ class Ship {
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
+
+    // Triple disparo: 3 balas paralelas (mismo ángulo, offset perpendicular)
+    if (this.tripleShot > 0) {
+      const px = -Math.sin(this.angle);
+      const py =  Math.cos(this.angle);
+      return [-TRIPLE_GAP, 0, TRIPLE_GAP].map(o =>
+        new Bullet(ox + px * o, oy + py * o, this.angle));
+    }
+
     return [new Bullet(ox, oy, this.angle)];
   }
 
@@ -316,6 +327,8 @@ const POWERUP_COLOR = '#ffd23f';
 const POWERUP_TTL   = 10;    // segundos en pantalla
 const BOOST_TIME    = 5;     // duración del efecto en la nave
 const DROP_CHANCE   = 0.12;  // probabilidad de drop por asteroide destruido
+const TRIPLE_TIME   = 5;     // duración del triple disparo (bonus de la estrella fugaz)
+const TRIPLE_GAP    = 6;     // separación entre balas paralelas
 
 class PowerUp {
   constructor(x, y) {
@@ -424,6 +437,7 @@ function killShip() {
   explode(ship.x, ship.y, 14);
   ship.dead = true;
   ship.speedBoost = 0;   // el power-up se pierde al morir
+  ship.tripleShot = 0;   // el triple disparo también
   lives--;
   if (lives <= 0) {
     state = 'gameover';
@@ -484,9 +498,12 @@ function update(dt) {
         score += a.points;
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
-        // Drop del power-up de velocidad (máx. 1 en pantalla; la estrella fugaz no suelta)
-        if (!a.special && powerUps.length === 0 && Math.random() < DROP_CHANCE)
+        // La estrella fugaz otorga triple disparo; los asteroides normales pueden soltar velocidad
+        if (a.special) {
+          ship.tripleShot = TRIPLE_TIME;   // se refresca si ya estaba activo
+        } else if (powerUps.length === 0 && Math.random() < DROP_CHANCE) {
           powerUps.push(new PowerUp(a.x, a.y));
+        }
       }
     }
   }
@@ -542,12 +559,18 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.fillText(`SCORE  ${score}`, 14, 26);
 
-  // Cuenta regresiva del power-up de velocidad activo
+  // Cuenta regresiva de los efectos activos (velocidad / triple disparo)
+  let effectY = 48;
   if (!ship.dead && ship.speedBoost > 0) {
     ctx.fillStyle = POWERUP_COLOR;
-    ctx.fillText(`VELOZ ${ship.speedBoost.toFixed(1)}s`, 14, 48);
-    ctx.fillStyle = '#fff';
+    ctx.fillText(`VELOZ ${ship.speedBoost.toFixed(1)}s`, 14, effectY);
+    effectY += 22;
   }
+  if (!ship.dead && ship.tripleShot > 0) {
+    ctx.fillStyle = POWERUP_COLOR;
+    ctx.fillText(`TRIPLE ${ship.tripleShot.toFixed(1)}s`, 14, effectY);
+  }
+  ctx.fillStyle = '#fff';
 
   ctx.textAlign = 'center';
   ctx.fillText(`NIVEL ${level}`, W / 2, 26);
