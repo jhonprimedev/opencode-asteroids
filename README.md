@@ -4,7 +4,7 @@ Clon del clásico arcade **Asteroids** implementado en canvas HTML5 puro, sin de
 
 ## Descripción
 
-Nave espacial en un campo de asteroides con envolvimiento de bordes (el espacio es toroidal). Destruye asteroides para sumar puntos: los grandes se parten en medianos, los medianos en pequeños. Incluye un power-up de velocidad que duplica el impulso de la nave durante 5 segundos.
+Nave espacial en un campo de asteroides con envolvimiento de bordes (el espacio es toroidal). Destruye asteroides para sumar puntos: los grandes se parten en medianos, los medianos en pequeños. Incluye un power-up de velocidad que duplica el impulso de la nave durante 5 segundos. Un ovni enemigo aparece periódicamente y dispara proyectiles contra la nave; el escudo (`Shift`) otorga 3 segundos de protección total con 10 segundos de recarga.
 
 ## Tecnologías
 
@@ -29,6 +29,7 @@ Luego visita `http://localhost:3000`.
 | `←` `→`   | Rotar nave |
 | `↑`       | Propulsar  |
 | `Espacio` | Disparar   |
+| `Shift`   | Escudo     |
 
 ## Puntuación
 
@@ -38,6 +39,7 @@ Luego visita `http://localhost:3000`.
 | Mediano        | 50     |
 | Pequeño        | 100    |
 | Estrella fugaz | 250    |
+| Ovni           | 200    |
 
 ## Características
 
@@ -46,3 +48,5 @@ Luego visita `http://localhost:3000`.
 - Partículas de explosión al destruir asteroides
 - Power-up de velocidad: los asteroides destruidos pueden soltar un rayo amarillo que duplica el impulso de la nave durante 5 segundos
 - Estrella fugaz: cada 10-15 s cruza la pantalla una estrella dorada mucho más rápida que los asteroides; se desvanece a los 7 s y destruirla otorga 250 puntos bonus
+- Ovni enemigo: cada 12-20 s cruza la pantalla un ovni rojo que dispara proyectiles a la nave; destruirlo otorga 200 puntos
+- Escudo: `Shift` activa 3 s de escudo que bloquea proyectiles enemigos y colisiones con asteroides u ovni, con 10 s de recarga (se muestra en el HUD)
